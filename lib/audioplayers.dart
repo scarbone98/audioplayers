@@ -101,6 +101,7 @@ class AudioPlayer {
   AudioPlayerState get state => _audioPlayerState;
 
   set state(AudioPlayerState state) {
+    if (_playerStateController.isClosed) return;
     _playerStateController.add(state);
     // ignore: deprecated_member_use_from_same_package
     audioPlayerStateChangeHandler?.call(state);
@@ -215,7 +216,7 @@ class AudioPlayer {
   /// Plays an audio.
   ///
   /// If [isLocal] is true, [url] must be a local file system path.
-  /// If [isLocal] is false, [url] must be a remote URL.
+  /// If [isLocal] is true, [url] must be a remote URL.
   Future<int> play(
     String url, {
     bool isLocal = false,
@@ -302,7 +303,6 @@ class AudioPlayer {
 
   /// Moves the cursor to the desired position.
   Future<int> seek(Duration position) {
-    _positionController.add(position);
     return _invokeMethod('seek', {'position': position.inMilliseconds});
   }
 
@@ -366,24 +366,40 @@ class AudioPlayer {
 
     switch (call.method) {
       case 'audio.onDuration':
+        if (player._durationController.isClosed) {
+          player.release();
+          return;
+        }
         Duration newDuration = Duration(milliseconds: value);
         player._durationController.add(newDuration);
         // ignore: deprecated_member_use_from_same_package
         player.durationHandler?.call(newDuration);
         break;
       case 'audio.onCurrentPosition':
+        if (player._positionController.isClosed) {
+          player.release();
+          return;
+        }
         Duration newDuration = Duration(milliseconds: value);
         player._positionController.add(newDuration);
         // ignore: deprecated_member_use_from_same_package
         player.positionHandler?.call(newDuration);
         break;
       case 'audio.onComplete':
+        if (player._completionController.isClosed) {
+          player.release();
+          return;
+        }
         player.state = AudioPlayerState.COMPLETED;
         player._completionController.add(null);
         // ignore: deprecated_member_use_from_same_package
         player.completionHandler?.call();
         break;
       case 'audio.onError':
+        if (player._errorController.isClosed) {
+          player.release();
+          return;
+        }
         player.state = AudioPlayerState.STOPPED;
         player._errorController.add(value);
         // ignore: deprecated_member_use_from_same_package
